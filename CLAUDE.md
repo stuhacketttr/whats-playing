@@ -1,6 +1,6 @@
 # CLAUDE.md — What's Playing
 
-Read this first. Then read `docs/HANDOFF.md` (status, decisions, what is and isn't verified).
+Read this first. Then read `docs/HANDOFF.md` (status, decisions, what is and isn't verified). **Start with its "Pick up here" section** for the latest state and next actions.
 
 ## What this is
 A personal Windows desktop app that identifies the track playing on the PC.
@@ -61,10 +61,10 @@ CI (`.github/workflows/tests.yml`) runs compile + pytest on windows-latest, Pyth
 11. **Estimator honesty:** BPM/key estimated from audio are labelled "est."/"~" in the UI. Do not present estimates as published values.
 
 ## Known limits / unverified (see docs/HANDOFF.md for detail)
-- Nothing here has been built or run on real Windows in the previous (Linux) sessions: PyInstaller builds, Inno Setup compile, the pywebview window, WASAPI capture on his hardware.
+- The PyInstaller folder build and the pywebview window now run on Stu's PC. Still unrun: `build-onefile.bat`, the Inno Setup installer.
 - GetSongBPM's live JSON shape is coded from its docs; the first real call may need adjusting.
 - BPM/key estimator proven on synthetic audio only; real-music accuracy unknown. Half/double-time bias for fast music (jungle/DnB ~170–180).
-- ShazamIO is unofficial/reverse-engineered: legal and reliability risk. shazam-api.com balance needs topping up by Stu.
+- ShazamIO is unofficial/reverse-engineered: legal and reliability risk. shazam-api.com is asynchronous (POST, then poll `resultsUrl`); credits work.
 
 ## Roadmap (not started unless Stu asks)
 Spotify "add to favourites" (button is a disabled placeholder; needs a free Spotify Client ID, PKCE flow) · tune estimators on real clips (Stu to supply `last_clip.wav` files) · code signing · optional GitHub Pages site · auto-update.

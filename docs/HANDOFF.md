@@ -2,20 +2,41 @@
 
 Status as of 8 November 2026. Version 1.1.0 (see `legal.APP_VERSION`). Written for Claude Code picking this up from the chat-based build sessions.
 
+## Pick up here (8 November 2026)
+**Repo:** `C:\Users\stuha\repos\whats-playing` (the repo root; it used to be nested one folder deeper and was flattened). Remote: `https://github.com/stuhacketttr/whats-playing`, branch `main`, last pushed commit `77fda5f`. Start Claude Code from this folder so the session appears under the repo in the sidebar.
+
+**Done this session**
+- Genre and label from Shazam, with a CSV migration (commit `946ba76`).
+- `.env` backups and the local handoff files (`START_HERE.md`, the zip) are git-ignored.
+- shazam-api.com retry fixed: poll `resultsUrl`, read the `artwork` field, `no_matches` is not an error (`21eafe8`, `77fda5f`). Tests added for both.
+- Built the windowed exe and put a "What's Playing" shortcut on the desktop.
+
+**Current quirks**
+- The live exe is in `dist-new\WhatsPlaying\` (not `dist\`). `dist\WhatsPlaying` is an empty folder that Windows says is in use by an unknown process; `build.bat` fails on it. Delete the whole `dist` folder after a reboot, then `build.bat` works as normal and the shortcut can point back at `dist\WhatsPlaying`.
+- `dist-new/` is **not** in `.gitignore` yet, so it shows as untracked. Add it (or move the build back to `dist\`).
+- The exe uses its own `.env` and `recognitions.csv` in its folder, which are copies. History in the exe and in the repo root has diverged. If you rebuild, save those two files first and copy them back.
+- `build.bat` ends with `pause`; from a script, pipe an empty line into it.
+
+**Next actions**
+1. Try "Try shazam-api.com" on a real missed clip in the rebuilt exe and confirm both the match and no-match paths.
+2. Delete `dist` after a reboot, add `dist-new/` to `.gitignore` or rebuild into `dist`, and repoint the shortcut.
+3. Decide how to keep one history file (repo copy vs exe copy).
+4. Still open from before: GetSongBPM live check, `build-onefile.bat` and `build-installer.bat` (needs Inno Setup), the "Open decisions" below.
+
 ## Where it stands
-Feature-complete for the owner's brief, tested in a Linux sandbox with mocks, **not yet run end to end on Windows**.
+Feature-complete for the owner's brief. Now running on Stu's Windows PC from source and as a PyInstaller build; see "Pick up here" below.
 
 | Area | State |
 |---|---|
 | Capture (WASAPI loopback via `soundcard`) | Written; verified on Stu's PC in the early versions ("works well") |
 | ShazamIO recognition | Verified by Stu (does nearly all matches) |
-| shazam-api.com retry | Coded; last real call returned `403 Not enough balance` — Stu needs to top up |
+| shazam-api.com retry | **Fixed 8 Nov 2026, verified live** (one call, real key). The v2 API is asynchronous: POST returns `processing` plus `resultsUrl`, which `rec_shazamapi` now polls. A miss is `status: "no_matches"`, treated as a plain no-match. Credits work. Not yet re-tried from the rebuilt exe |
 | History, tick-box delete, CSV persistence + migration | Unit/integration tested (mocked) |
 | BPM + key (lookup then estimate) | Logic tested; estimator on **synthetic audio only**; GetSongBPM response shape from docs, **never called live** |
 | Camelot + key names | Tested against the wheel |
 | Find-on links (Spotify/Bandcamp/SoundCloud search URLs) | Tested for URL building; opens via `/api/open_external` |
 | Help & legal panel, TERMS, notices | Generated and tested for consistency |
-| PyInstaller folder / one-file builds, Inno installer | Scripts written, **never run** |
+| PyInstaller folder build | **Built and run on Stu's PC** (no console window, desktop shortcut). One-file build and Inno installer still **never run** |
 | Spotify favourites | Deliberately deferred (disabled button) |
 
 Tests: `pytest` → 96 passing at handoff.
