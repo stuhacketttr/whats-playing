@@ -1,5 +1,6 @@
 # --- Secrets and personal data: NEVER commit these ---
 .env
+.env.*.bak
 recognitions.csv
 recognitions.*.bak.csv
 recognitions.tmp
