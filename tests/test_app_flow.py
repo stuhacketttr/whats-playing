@@ -232,3 +232,11 @@ def test_copy_cover(app, client, monkeypatch):
 
 def test_discogs_link_is_offered(app):
     assert "https://www.discogs.com/search/?q=" in app.PAGE
+
+
+def test_rebound_host_is_refused(client):
+    """A DNS-rebinding page reaches the app under its own hostname; that must be rejected."""
+    assert client.get("/api/settings", headers={"Host": "evil.example"}).status_code == 403
+    assert client.post("/api/settings", json={"shazam_api_key": "x"},
+                       headers={"Host": "evil.example", "Origin": "http://evil.example"}).status_code == 403
+    assert client.get("/api/settings", headers={"Host": "127.0.0.1:5000"}).status_code == 200

@@ -66,6 +66,19 @@ SOURCE_LABEL = {"shazamio": "ShazamIO", "shazamapi": "shazam-api.com"}
 
 app = Flask(__name__)
 
+
+@app.before_request
+def _local_requests_only():
+    """Defence against DNS rebinding and cross-site requests: the app is only ever reached as
+    127.0.0.1 or localhost, so any other Host header (a rebound attacker domain) is refused, and
+    an Origin header, when sent, must be this same local address."""
+    host = request.host
+    if host.rsplit(":", 1)[0] not in ("127.0.0.1", "localhost"):
+        return Response("Forbidden", status=403)
+    origin = request.headers.get("Origin")
+    if origin and origin != f"http://{host}":
+        return Response("Forbidden", status=403)
+
 state = {
     "status": "idle",   # idle | listening | matching | matched | no_match | silence | error
     "message": "Ready.",
