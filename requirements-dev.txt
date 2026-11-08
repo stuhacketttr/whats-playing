@@ -1,0 +1,7 @@
+# What the tests and CI need. The tests mock audio capture and the network, so the heavy runtime
+# packages (shazamio, soundcard, pywebview) are NOT needed to run them.
+flask>=3.0
+requests>=2.31
+numpy
+python-dotenv>=1.0
+pytest>=8

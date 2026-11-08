@@ -1,0 +1,182 @@
+What's Playing 1.1.0 - terms of use, privacy and notices
+
+Third-party software licences are listed in the Credits section of the
+program's Help and in full in THIRD_PARTY_NOTICES.txt.
+
+This text is provided for information and is not legal advice.
+
+TERMS OF USE
+============
+
+These terms apply to your use of What's Playing (version 1.1.0).
+
+1. The software
+
+What's Playing is free software released under the MIT Licence (see Notices).
+That licence, not these terms, governs copying, modifying and sharing the
+code.
+
+2. Your use
+
+You use the program at your own risk and you are responsible for what it
+listens to. It captures whatever your PC is playing, which could include
+voices from calls or meetings. Do not use it where you do not have the right
+to capture or share that audio, and do not use it to infringe anyone's
+copyright or privacy.
+
+3. Results
+
+Identification is not guaranteed. A result can be wrong, incomplete or
+missing. BPM and key values, whether looked up or estimated, can also be
+wrong. Do not rely on them where accuracy matters.
+
+4. Third-party services
+
+The program relies on services run by other people (see Privacy and Notices).
+You must follow their terms. If you add a shazam-api.com or GetSongBPM key, it
+is your key: keep it secret, and you are responsible for its use and cost.
+GetSongBPM's data is provided under its own API terms, which require a visible
+link back to getsongbpm.com; the program shows that link whenever it uses
+their data. Never share a copy of the program or its .env file that contains
+your key.
+
+5. No warranty and limit of liability
+
+The program is provided "as is", without warranty of any kind. To the fullest
+extent the law allows, the author is not liable for any loss or damage arising
+from its use. Nothing in these terms limits liability that cannot lawfully be
+limited, including liability for fraud, or for death or personal injury caused
+by negligence.
+
+6. Changes and governing law
+
+These terms may change in later versions. They are governed by the law of
+England and Wales.
+
+Questions: by opening an issue at https://github.com/stuhacketttr/whats-
+playing/issues.
+
+PRIVACY
+=======
+
+This explains what the program stores on your PC and what it sends over the
+internet.
+
+Kept on your PC
+  * History (recognitions.csv): artist, title, album, ISRC code, time, which
+    service matched, BPM and key (and whether they were looked up or
+    estimated), links, and the web address of the cover art.
+  * last_clip.wav: your most recent captured clip, overwritten each time. Set
+    SAVE_LAST_CLIP=0 to disable.
+  * retry_clip.wav: a clip ShazamIO missed, kept only until you retry, dismiss
+    it, or a track is matched.
+  * .env: your settings, including any API key. Treat it like a password.
+  * whatsplaying.log: technical messages from the program.
+  * Deleting History rows removes them from the list and recognitions.csv, but
+    a .bak.csv backup made just before still holds them until you delete it.
+
+No tracking by the author
+
+The program has no analytics or telemetry. The author does not receive your
+history, audio or any other data.
+
+What is sent over the internet
+  * Every identification: ShazamIO builds an audio fingerprint from the clip
+    on your PC and sends it to Shazam's servers (run by Apple), together with
+    the usual details any internet request reveals, such as your IP address.
+  * Only if you click Try shazam-api.com: the audio clip itself is uploaded to
+    shazam-api.com using your key. Its privacy policy says uploaded audio is
+    deleted after processing, generally within an hour, and that it logs
+    request details such as IP address and time.
+  * Only if you add a GetSongBPM key: the artist name and track title (text
+    only, no audio) are sent to GetSongBPM, with the usual details such as
+    your IP address, to look up BPM and key. Estimating BPM and key from the
+    clip happens entirely on your PC.
+  * Find on links: clicking one opens your default browser at that site's
+    search page, with the artist and title in the address. That site then sees
+    your visit and its own privacy policy applies.
+  * Cover art: the window loads images from web addresses supplied by those
+    services, so the image hosts can see your IP address.
+
+Take care with sensitive audio
+
+The program records everything your PC plays, so avoid running it during
+calls, meetings or anything private, especially if other people's voices could
+be captured.
+
+Their policies apply too
+
+Once data reaches those services, their own privacy policies apply, not this
+one.
+
+Your choices
+
+Delete History rows in the app, delete the files above, or delete the
+program's folder to remove everything. Uninstalling deliberately keeps .env
+and recognitions.csv so you do not lose them by accident.
+  shazam-api.com privacy policy: https://shazam-api.com/privacy
+  Apple privacy information: https://www.apple.com/legal/privacy/
+  GetSongBPM website (see its own policy): https://getsongbpm.com
+
+NOTICES
+=======
+
+Copyright (c) 2026 stuhacketttr. Released under the MIT Licence (text below).
+
+Not affiliated
+
+Shazam is a trademark of Apple Inc. Spotify, Bandcamp, SoundCloud and Mixed In
+Key (Camelot) are trademarks of their owners. ShazamIO is an independent open-
+source project. shazam-api.com is an independent service that states it is not
+affiliated with Apple or Shazam. What's Playing is not affiliated with,
+endorsed by or sponsored by Apple, Shazam, ShazamIO, shazam-api.com,
+GetSongBPM, Spotify, Bandcamp, SoundCloud, Mixed In Key, Microsoft or any
+other company named here. All trademarks belong to their owners and are used
+only to identify the services involved.
+
+Unofficial access
+
+ShazamIO describes itself as a reverse-engineered Shazam API. It is not an
+official Apple interface, it may stop working at any time, and its use may not
+be permitted by Shazam's terms. You use it at your own risk.
+
+Music data and artwork
+
+Track titles, artist names, album details, artwork, tempo and key data and
+links come from third-party services and belong to their owners. Tempo and key
+data from GetSongBPM is used under its API terms, with the credit link they
+require. The program only displays them. It does not store artwork (only its
+web address in your history), does not copy or redistribute music, and gives
+you no rights in any music or images.
+
+Not legal advice
+
+This help text is provided for information and is not legal advice.
+
+Contact: by opening an issue at https://github.com/stuhacketttr/whats-
+playing/issues.
+
+MIT LICENCE
+===========
+
+MIT License
+
+Copyright (c) 2026 stuhacketttr
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

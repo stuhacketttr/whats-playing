@@ -1,0 +1,30 @@
+# --- Secrets and personal data: NEVER commit these ---
+.env
+recognitions.csv
+recognitions.*.bak.csv
+recognitions.tmp
+last_clip.wav
+retry_clip.wav
+whatsplaying.log
+
+# --- Build output ---
+.venv/
+.venv-build/
+build/
+build-onefile/
+dist/
+installer/
+*.spec
+__pycache__/
+*.pyc
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# --- Tests ---
+.pytest_cache/
+.coverage
+htmlcov/
