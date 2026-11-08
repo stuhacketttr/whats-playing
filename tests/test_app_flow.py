@@ -272,3 +272,31 @@ def test_missing_genre_and_label_are_fine(app, client, match):
     client.post("/api/identify")
     c = state_of(client)["current"]
     assert not c.get("genre") and not c.get("label")
+
+
+def test_shazamapi_polls_until_done(monkeypatch, tmp_path):
+    import app
+    clip = tmp_path / "c.wav"
+    clip.write_bytes(b"RIFF")
+    monkeypatch.setenv("SHAZAM_API_KEY", "k")
+    monkeypatch.setattr(app.time, "sleep", lambda s: None)
+
+    class R:
+        status_code = 200
+        text = ""
+
+        def __init__(self, body):
+            self.body = body
+
+        def json(self):
+            return self.body
+
+    monkeypatch.setattr(app.requests, "post", lambda *a, **k: R(
+        {"status": "processing", "resultsUrl": "/api/v2/results/u"}))
+    answers = iter([{"status": "processing"}, {"status": "success", "results": [
+        {"title": "T", "artist": "A", "artwork": "https://x/c.jpg", "genre": "G", "label": "L"}]}])
+    urls = []
+    monkeypatch.setattr(app.requests, "get", lambda url, **k: (urls.append(url), R(next(answers)))[1])
+    res = app.rec_shazamapi(str(clip))
+    assert res["title"] == "T" and res["cover"] == "https://x/c.jpg" and res["genre"] == "G"
+    assert urls == ["https://shazam-api.com/api/v2/results/u"] * 2

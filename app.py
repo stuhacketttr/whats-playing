@@ -167,6 +167,23 @@ def rec_shazamapi(path: str):
     if r.status_code >= 400:
         raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
     j = r.json()
+    # The API is asynchronous: the POST returns status "processing" plus a resultsUrl to poll.
+    results_url = j.get("resultsUrl")
+    deadline = time.time() + 45
+    while j.get("status") == "processing" and results_url and time.time() < deadline:
+        time.sleep(2)
+        pr = requests.get(
+            "https://shazam-api.com" + results_url,
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=30,
+        )
+        if pr.status_code >= 400:
+            raise RuntimeError(f"HTTP {pr.status_code}: {pr.text[:200]}")
+        j = pr.json()
+    if j.get("status") == "processing":
+        raise RuntimeError("timed out waiting for shazam-api.com to finish")
+    if j.get("status") not in ("success", "no_match", "not_found") and not j.get("results"):
+        raise RuntimeError(f"unexpected response: {str(j)[:200]}")
     results = j.get("results") or []
     if j.get("status") != "success" or not results:
         return None
@@ -177,7 +194,7 @@ def rec_shazamapi(path: str):
         "album": x.get("album"),
         "genre": x.get("genre"),
         "label": x.get("label"),
-        "cover": x.get("cover") or x.get("coverArt") or x.get("image"),
+        "cover": x.get("artwork") or x.get("cover") or x.get("coverArt") or x.get("image"),
         "isrc": x.get("isrc"),
         "links": x.get("links") or {},
     }
