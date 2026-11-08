@@ -240,3 +240,35 @@ def test_rebound_host_is_refused(client):
     assert client.post("/api/settings", json={"shazam_api_key": "x"},
                        headers={"Host": "evil.example", "Origin": "http://evil.example"}).status_code == 403
     assert client.get("/api/settings", headers={"Host": "127.0.0.1:5000"}).status_code == 200
+
+
+# ------------------------------------------------------------ genre and label
+def test_shazamio_genre_and_label_are_parsed_saved_and_reloaded(app, client, monkeypatch):
+    import sys, types
+    out = {"track": {"title": "T", "subtitle": "A", "genres": {"primary": "Dance"},
+                     "sections": [{"metadata": [{"title": "Album", "text": "Alb"},
+                                                {"title": "Label", "text": "Some Records"}]}]}}
+
+    class FakeShazam:
+        async def recognize(self, path):
+            return out
+
+    monkeypatch.setitem(sys.modules, "shazamio", types.SimpleNamespace(Shazam=FakeShazam))
+    res = app.rec_shazamio("x.wav")
+    assert (res["genre"], res["label"], res["album"]) == ("Dance", "Some Records", "Alb")
+    monkeypatch.setattr(app, "rec_shazamio", lambda p: res)
+    client.post("/api/identify")
+    c = state_of(client)["current"]
+    assert (c["genre"], c["label"]) == ("Dance", "Some Records")
+    r = rows()[-1]
+    assert (r["genre"], r["label"]) == ("Dance", "Some Records")
+    app.load_history()                      # round trip through the CSV
+    h = state_of(client)["history"][0]
+    assert (h["genre"], h["label"]) == ("Dance", "Some Records")
+
+
+def test_missing_genre_and_label_are_fine(app, client, match):
+    match("Plain")
+    client.post("/api/identify")
+    c = state_of(client)["current"]
+    assert not c.get("genre") and not c.get("label")

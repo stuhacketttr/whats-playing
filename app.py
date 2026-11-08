@@ -51,7 +51,7 @@ logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 LOG_FILE = BASE / "recognitions.csv"
 FIELDS = ["id", "timestamp", "artist", "title", "album", "isrc", "source", "cover", "links",
-          "bpm", "bpm_src", "key", "camelot", "key_src"]
+          "bpm", "bpm_src", "key", "camelot", "key_src", "genre", "label"]
 MUSIC_FIELDS = ("bpm", "bpm_src", "key", "camelot", "key_src")
 CLIP_SECONDS = int(os.getenv("CLIP_SECONDS", "10"))
 CONTINUOUS_GAP = int(os.getenv("CONTINUOUS_GAP_SECONDS", "15"))
@@ -131,16 +131,20 @@ def rec_shazamio(path: str):
     t = (out or {}).get("track")
     if not t:
         return None
-    album = None
+    album = label = None
     for section in t.get("sections", []):
         for meta in section.get("metadata", []) or []:
             if meta.get("title") == "Album":
                 album = meta.get("text")
+            elif meta.get("title") == "Label":
+                label = meta.get("text")
     images = t.get("images") or {}
     return {
         "title": t.get("title"),
         "artist": t.get("subtitle"),
         "album": album,
+        "genre": (t.get("genres") or {}).get("primary"),
+        "label": label,
         "cover": images.get("coverarthq") or images.get("coverart"),
         "isrc": t.get("isrc"),
         "links": {"shazam": t.get("url")},
@@ -171,6 +175,8 @@ def rec_shazamapi(path: str):
         "title": x.get("title"),
         "artist": x.get("artist"),
         "album": x.get("album"),
+        "genre": x.get("genre"),
+        "label": x.get("label"),
         "cover": x.get("cover") or x.get("coverArt") or x.get("image"),
         "isrc": x.get("isrc"),
         "links": x.get("links") or {},
@@ -203,6 +209,7 @@ def _to_csv_row(r: dict) -> dict:
         "links": json.dumps(r.get("links") or {}),
         "bpm": "" if r.get("bpm") is None else r["bpm"], "bpm_src": r.get("bpm_src") or "",
         "key": r.get("key") or "", "camelot": r.get("camelot") or "", "key_src": r.get("key_src") or "",
+        "genre": r.get("genre") or "", "label": r.get("label") or "",
     }
 
 
@@ -259,6 +266,7 @@ def load_history():
             rows.append({
                 "bpm": bpm, "bpm_src": r.get("bpm_src") or "", "key": r.get("key") or "",
                 "camelot": r.get("camelot") or "", "key_src": r.get("key_src") or "",
+                "genre": r.get("genre") or None, "label": r.get("label") or None,
                 "id": r.get("id") or uuid.uuid4().hex[:8],
                 "time": r.get("timestamp", ""),
                 "artist": r.get("artist", ""), "title": r.get("title", ""),
@@ -807,7 +815,7 @@ function renderCurrent(c){
   if(c.cover&&c.cover.startsWith('http'))$('cover').src=c.cover;else $('cover').removeAttribute('src');
   info.append(el('p','title',c.title||''),el('p','artist',c.artist||''));
   bpmKeyBlock(c,info);
-  const det=[c.album&&('Album: '+c.album),c.isrc&&('ISRC: '+c.isrc)].filter(Boolean);
+  const det=[c.album&&('Album: '+c.album),c.label&&('Label: '+c.label),c.genre&&('Genre: '+c.genre),c.isrc&&('ISRC: '+c.isrc)].filter(Boolean);
   if(det.length)info.append(el('p','meta',det.join(' \\u00b7 ')));
   const b=el('p','meta');b.append(el('span','badge',src(c.source)),document.createTextNode(c.time));info.append(b);
   const act=el('div','actions');

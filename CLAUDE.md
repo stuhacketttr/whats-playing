@@ -50,7 +50,7 @@ CI (`.github/workflows/tests.yml`) runs compile + pytest on windows-latest, Pyth
 ## Gotchas — do not break these
 1. **Lock order:** always take `csv_lock` before `state_lock`. Capture uses the `busy` lock; retry uses `retry_lock`. Reversing the order deadlocks.
 2. **`PAGE` is a normal (non-raw) Python triple-quoted string** containing HTML and JS. Every JS backslash must be doubled (`\\s`, `\\u00b7`, `\\(`). A single backslash either mangles the regex or raises a SyntaxError. Always run `python -W error -m py_compile app.py`; `test_embedded_javascript_has_no_python_escape_damage` also guards this. Don't "tidy" it into a raw string without re-checking every escape.
-3. **CSV schema** is `id,timestamp,artist,title,album,isrc,source,cover,links,bpm,bpm_src,key,camelot,key_src`. Older files are auto-migrated after a timestamped `*.bak.csv`. Deleting rows rewrites atomically. Any schema change needs a migration + a test.
+3. **CSV schema** is `id,timestamp,artist,title,album,isrc,source,cover,links,bpm,bpm_src,key,camelot,key_src,genre,label`. Older files are auto-migrated after a timestamped `*.bak.csv`. Deleting rows rewrites atomically. Any schema change needs a migration + a test.
 4. **`BASE`** (where `.env`, CSV, clips live) = `WHATSPLAYING_HOME` if set, else the exe's folder when frozen, else the source folder. Tests rely on `WHATSPLAYING_HOME`; never write to the real folder from tests.
 5. **`enrich()` must never raise** — a failed BPM/key lookup must not lose a successful match. It reuses the fields if the track equals the latest history row (no repeat API calls).
 6. **Link opening** goes through `/api/open_external` (http/https only, same-origin only) so links open in the default browser, not inside the WebView.
