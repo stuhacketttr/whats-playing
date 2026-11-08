@@ -29,3 +29,7 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Local handoff files
+START_HERE.md
+whats-playing-handoff.zip
