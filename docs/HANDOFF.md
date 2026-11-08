@@ -3,7 +3,7 @@
 Status as of 8 November 2026. Version 1.1.0 (see `legal.APP_VERSION`). Written for Claude Code picking this up from the chat-based build sessions.
 
 ## Pick up here (8 November 2026)
-**Repo:** `C:\Users\stuha\repos\whats-playing` (the repo root; it used to be nested one folder deeper and was flattened). Remote: `https://github.com/stuhacketttr/whats-playing`, branch `main`, last pushed commit `77fda5f`. Start Claude Code from this folder so the session appears under the repo in the sidebar.
+**Repo:** `C:\Users\stuha\repos\whats-playing` (the repo root; it used to be nested one folder deeper and was flattened). Remote: `https://github.com/stuhacketttr/whats-playing`, branch `main`, last pushed commit `01e1cfa` plus the `.gitignore` update. Start Claude Code from this folder so the session appears under the repo in the sidebar.
 
 **Done this session**
 - Genre and label from Shazam, with a CSV migration (commit `946ba76`).
@@ -13,13 +13,13 @@ Status as of 8 November 2026. Version 1.1.0 (see `legal.APP_VERSION`). Written f
 
 **Current quirks**
 - The live exe is in `dist-new\WhatsPlaying\` (not `dist\`). `dist\WhatsPlaying` is an empty folder that Windows says is in use by an unknown process; `build.bat` fails on it. Delete the whole `dist` folder after a reboot, then `build.bat` works as normal and the shortcut can point back at `dist\WhatsPlaying`.
-- `dist-new/` is **not** in `.gitignore` yet, so it shows as untracked. Add it (or move the build back to `dist\`).
+- `dist-new/` is git-ignored.
 - The exe uses its own `.env` and `recognitions.csv` in its folder, which are copies. History in the exe and in the repo root has diverged. If you rebuild, save those two files first and copy them back.
 - `build.bat` ends with `pause`; from a script, pipe an empty line into it.
 
 **Next actions**
 1. Try "Try shazam-api.com" on a real missed clip in the rebuilt exe and confirm both the match and no-match paths.
-2. Delete `dist` after a reboot, add `dist-new/` to `.gitignore` or rebuild into `dist`, and repoint the shortcut.
+2. Delete `dist` after a reboot, rebuild into `dist`, and repoint the shortcut.
 3. Decide how to keep one history file (repo copy vs exe copy).
 4. Still open from before: GetSongBPM live check, `build-onefile.bat` and `build-installer.bat` (needs Inno Setup), the "Open decisions" below.
 

@@ -33,3 +33,4 @@ htmlcov/
 # Local handoff files
 START_HERE.md
 whats-playing-handoff.zip
+dist-new/
