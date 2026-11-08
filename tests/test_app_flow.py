@@ -180,3 +180,55 @@ def test_embedded_javascript_has_no_python_escape_damage(app):
     page = app.PAGE
     assert r"const FEAT=/[\(\[]\s*(feat|ft|with)\b[^\)\]]*[\)\]]/ig;" in page
     assert "\\u00b7" in page and "\x08" not in page
+
+
+# ----------------------------------------------------------------- settings
+def test_settings_save_updates_env_backs_up_and_never_returns_the_key(app, client, monkeypatch):
+    env = HOME / ".env"
+    env.write_text("# comment\nSHAZAM_API_KEY=\nCLIP_SECONDS=10\n", encoding="utf-8")
+    monkeypatch.setattr(app, "_env_backup_done", False)
+    r = client.post("/api/settings", json={"getsongbpm_api_key": "abcd1234efgh", "shazam_api_key": "zzzz9999yyyy"})
+    j = r.get_json()
+    assert r.status_code == 200 and j["getsongbpm_api_key"]["set"] and j["shazam_api_key"]["set"]
+    assert "abcd1234efgh" not in r.get_data(as_text=True)
+    text = env.read_text(encoding="utf-8")
+    assert "SHAZAM_API_KEY=zzzz9999yyyy" in text and "GETSONGBPM_API_KEY=abcd1234efgh" in text
+    assert "# comment" in text and "CLIP_SECONDS=10" in text
+    assert glob.glob(str(HOME / ".env.*.bak"))
+    assert client.get("/api/state").get_json()["shazamapi_ready"] is True
+    # clearing one key leaves the other alone
+    j = client.post("/api/settings", json={"shazam_api_key": ""}).get_json()
+    assert not j["shazam_api_key"]["set"] and j["getsongbpm_api_key"]["set"]
+    monkeypatch.delenv("GETSONGBPM_API_KEY", raising=False)
+    env.unlink()
+
+
+def test_settings_rejects_bad_values_and_foreign_origin(client):
+    assert client.post("/api/settings", json={"shazam_api_key": "a b"}).status_code == 400
+    assert client.post("/api/settings", json={"shazam_api_key": "a\nb=c"}).status_code == 400
+    assert client.post("/api/settings", json={"shazam_api_key": "x"},
+                       headers={"Origin": "https://evil.example"}).status_code == 403
+
+
+# -------------------------------------------------------------- copy cover
+def test_copy_cover(app, client, monkeypatch):
+    class R:
+        headers = {"Content-Type": "image/jpeg"}
+        raw = type("Raw", (), {"read": lambda self, n, decode_content=False: b"\xff\xd8jpeg"})()
+        def raise_for_status(self): pass
+    got = []
+    monkeypatch.setattr(app.requests, "get", lambda url, **kw: R())
+    monkeypatch.setattr(app, "copy_image_to_clipboard", lambda data: got.append(data))
+    monkeypatch.setattr(app, "rec_shazamio", lambda p: {
+        "title": "T", "artist": "A", "album": None, "cover": "https://example.com/c.jpg",
+        "isrc": None, "links": {}})
+    client.post("/api/identify")
+    tid = state_of(client)["current"]["id"]
+    assert client.post("/api/copy_cover", json={"id": tid}).get_json()["ok"] and got == [b"\xff\xd8jpeg"]
+    assert client.post("/api/copy_cover", json={"id": "nope"}).status_code == 404
+    assert client.post("/api/copy_cover", json={"id": tid},
+                       headers={"Origin": "https://evil.example"}).status_code == 403
+
+
+def test_discogs_link_is_offered(app):
+    assert "https://www.discogs.com/search/?q=" in app.PAGE

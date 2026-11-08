@@ -260,6 +260,71 @@ def load_history():
             state["history"] = list(reversed(rows))
 
 
+# ------------------------------------------------------------ settings (.env)
+ENV_FILE = BASE / ".env"
+SETTING_KEYS = {"shazam_api_key": "SHAZAM_API_KEY", "getsongbpm_api_key": "GETSONGBPM_API_KEY"}
+_env_backup_done = False
+_env_lock = threading.Lock()
+
+
+def _valid_secret(v: str) -> bool:
+    """API keys are single tokens: no spaces, quotes, '#' or line breaks (they would corrupt .env)."""
+    return len(v) <= 200 and not any(c.isspace() or c in "\"'#\\" for c in v)
+
+
+def save_env_values(values: dict):
+    """Set (or clear, when empty) KEY=value lines in .env, keeping every other line as it is.
+    The file is backed up once per session first, and the running app picks the change up at once."""
+    global _env_backup_done
+    with _env_lock:
+        lines = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.exists() else []
+        if ENV_FILE.exists() and not _env_backup_done:
+            stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            shutil.copy2(ENV_FILE, ENV_FILE.with_name(f".env.{stamp}.bak"))
+            _env_backup_done = True
+        for key, val in values.items():
+            new = f"{key}={val}"
+            for i, ln in enumerate(lines):
+                if ln.split("=", 1)[0].strip() == key and "=" in ln and not ln.lstrip().startswith("#"):
+                    lines[i] = new
+                    break
+            else:
+                lines.append(new)
+        tmp = ENV_FILE.with_name(".env.tmp")
+        tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        os.replace(tmp, ENV_FILE)
+        for key, val in values.items():
+            if val:
+                os.environ[key] = val
+            else:
+                os.environ.pop(key, None)
+
+
+def copy_image_to_clipboard(data: bytes):
+    """Put an image (any format Windows can decode) on the Windows clipboard via PowerShell,
+    so no extra Python package is needed. Raises RuntimeError on failure."""
+    import subprocess
+    fd, path = tempfile.mkstemp(suffix=".img")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        script = ("Add-Type -AssemblyName System.Windows.Forms,System.Drawing;"
+                  "$i=[System.Drawing.Image]::FromFile($env:WP_IMG);"
+                  "$d=New-Object System.Windows.Forms.DataObject;$d.SetImage($i);"
+                  "[System.Windows.Forms.Clipboard]::SetDataObject($d,$true);$i.Dispose()")
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-STA", "-Command", script],
+            env={**os.environ, "WP_IMG": path}, capture_output=True, text=True, timeout=30,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if r.returncode != 0:
+            raise RuntimeError((r.stderr or "clipboard error").strip()[:200])
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 # ------------------------------------------------------------------ core
 def clear_retry_clip():
     try:
@@ -446,6 +511,59 @@ def api_open_external():
     return jsonify(ok=True)
 
 
+@app.get("/api/settings")
+def api_settings():
+    """Only says whether each key is set, with a masked hint. The key itself is never sent to the page."""
+    out = {}
+    for field, env in SETTING_KEYS.items():
+        v = os.getenv(env, "").strip()
+        out[field] = {"set": bool(v), "hint": ("•" * 6 + v[-4:]) if len(v) > 8 else ("•" * 6 if v else "")}
+    return jsonify(out)
+
+
+@app.post("/api/settings")
+def api_save_settings():
+    origin = request.headers.get("Origin")
+    if origin and origin != request.host_url.rstrip("/"):
+        return jsonify(ok=False), 403
+    body = request.get_json(silent=True) or {}
+    values = {}
+    for field, env in SETTING_KEYS.items():
+        if field in body:
+            v = str(body[field] or "").strip()
+            if not _valid_secret(v):
+                return jsonify(ok=False, error="Keys can't contain spaces, quotes or # characters."), 400
+            values[env] = v
+    if values:
+        save_env_values(values)
+    return api_settings()
+
+
+@app.post("/api/copy_cover")
+def api_copy_cover():
+    origin = request.headers.get("Origin")
+    if origin and origin != request.host_url.rstrip("/"):
+        return jsonify(ok=False), 403
+    tid = (request.get_json(silent=True) or {}).get("id")
+    with state_lock:
+        rows = ([state["current"]] if state["current"] else []) + state["history"]
+    url = next((r.get("cover") for r in rows if r and r.get("id") == tid and r.get("cover")), None)
+    if not url or not url.startswith(("https://", "http://")):
+        return jsonify(ok=False, error="No album cover for this track."), 404
+    try:
+        r = requests.get(url, timeout=15, stream=True)
+        r.raise_for_status()
+        if not r.headers.get("Content-Type", "").startswith("image/"):
+            raise RuntimeError("the cover link did not return an image")
+        data = r.raw.read(10_000_001, decode_content=True)
+        if len(data) > 10_000_000:
+            raise RuntimeError("the cover image is too large")
+        copy_image_to_clipboard(data)
+    except Exception as exc:
+        return jsonify(ok=False, error=f"Couldn't copy the cover: {exc}"), 502
+    return jsonify(ok=True)
+
+
 @app.get("/api/last_clip")
 def api_last_clip():
     if not LAST_CLIP.exists():
@@ -519,6 +637,12 @@ body{font-family:Segoe UI,system-ui,sans-serif;background:#0f1115;color:#e8eaed;
 main{width:100%;max-width:640px;height:100%;display:flex;flex-direction:column;min-height:0}
 h1{font-size:20px;font-weight:600;margin:0}
 .top{flex:none;display:flex;align-items:center;justify-content:space-between;margin:0 0 14px}
+.topbtns{display:flex;gap:8px}
+.field{margin:14px 0}
+.field label{display:block;font-size:14px;font-weight:600;margin-bottom:4px}
+.field input{width:100%;box-sizing:border-box;background:#14171d;color:#e8eaed;border:1px solid #343a48;border-radius:8px;padding:9px 10px;font-size:14px}
+.field .note{font-size:12px;color:#889;margin:4px 0 0}
+.field .status{font-size:12px;margin:4px 0 0}
 .help{position:fixed;inset:0;background:#0f1115;z-index:20;padding:20px;box-sizing:border-box;display:flex;justify-content:center}
 .helpin{width:100%;max-width:640px;height:100%;display:flex;flex-direction:column;min-height:0}
 .helphead{flex:none;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -573,7 +697,7 @@ h2{font-size:14px;color:#9aa;font-weight:600;margin:0}
 #hist li input{width:16px;height:16px;flex:none;cursor:pointer}
 #hist li span{color:#889;font-size:12px}
 </style></head><body><main>
-<div class="top"><h1>What's Playing</h1><button id="helpbtn" class="small alt">Help &amp; legal</button></div>
+<div class="top"><h1>What's Playing</h1><div class="topbtns"><button id="setbtn" class="small alt">Settings</button><button id="helpbtn" class="small alt">Help &amp; legal</button></div></div>
 <div class="card">
   <img id="cover" class="cover" alt="">
   <div class="cardbody">
@@ -599,6 +723,23 @@ h2{font-size:14px;color:#9aa;font-weight:600;margin:0}
   <div id="tabs"></div>
   <div id="helpbody"></div>
 </div></div>
+<div id="settings" class="help" hidden><div class="helpin">
+  <div class="helphead"><h1>Settings</h1><button id="setclose" class="small alt">Close</button></div>
+  <div id="helpbody">
+    <p class="note">Keys are saved in the <code>.env</code> file next to the program (backed up first) and take effect straight away. Treat them like passwords.</p>
+    <div class="field"><label for="k_gsb">GetSongBPM API key</label>
+      <input id="k_gsb" type="password" autocomplete="off" spellcheck="false">
+      <p class="status" id="s_gsb"></p>
+      <p class="note">Free. Looks up published BPM and key; without it they are estimated from the audio. <a href="https://getsongbpm.com/api" data-ext="https://getsongbpm.com/api">Get a key</a></p></div>
+    <div class="field"><label for="k_shz">shazam-api.com API key (optional)</label>
+      <input id="k_shz" type="password" autocomplete="off" spellcheck="false">
+      <p class="status" id="s_shz"></p>
+      <p class="note">Only used when you click &ldquo;Try shazam-api.com&rdquo; after a missed clip. It uses paid credits.</p></div>
+    <div class="row"><button id="setsave">Save</button><span id="setmsg" class="meta"></span></div>
+    <p class="note">Leave a box empty to keep the saved key. To remove a key, tick the box below it.</p>
+    <p class="note"><label><input type="checkbox" id="c_gsb"> Remove the GetSongBPM key</label><br><label><input type="checkbox" id="c_shz"> Remove the shazam-api.com key</label></p>
+  </div>
+</div></div>
 <script>
 const $=id=>document.getElementById(id);
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
@@ -623,7 +764,8 @@ function findLinks(c){
   const q=((c.artist||'')+' '+(c.title||'').replace(FEAT,'')).replace(/\\s+/g,' ').trim(), e=encodeURIComponent(q);
   return [['Spotify','https://open.spotify.com/search/'+e],
           ['Bandcamp','https://bandcamp.com/search?q='+e+'&item_type=t'],
-          ['SoundCloud','https://soundcloud.com/search/sounds?q='+e]];
+          ['SoundCloud','https://soundcloud.com/search/sounds?q='+e],
+          ['Discogs','https://www.discogs.com/search/?q='+e+'&type=release']];
 }
 function keyText(c){return c.key?c.key+(c.camelot?' ('+c.camelot+')':''):'';}
 function bpmText(c){return c.bpm?(c.bpm_src==='estimate'?'~':'')+c.bpm+' BPM':'';}
@@ -659,6 +801,16 @@ function renderCurrent(c){
   act.append(el('span','meta','Find on'));
   findLinks(c).forEach(([n,u])=>{const a=extLink(n,u);a.title='Search '+n+' for this track';act.append(a);});
   Object.entries(c.links||{}).forEach(([k,v])=>{if(typeof v==='string'&&v.startsWith('http')){const a=el('a',null,k.charAt(0).toUpperCase()+k.slice(1));a.href=v;a.dataset.ext=v;act.append(a)}});
+  if(c.cover&&c.cover.startsWith('http')){
+    const cb=el('button','small alt','Copy cover');cb.title='Copy the album cover to the clipboard';
+    cb.onclick=async()=>{
+      cb.disabled=true;
+      try{const r=await post('/api/copy_cover',{id:c.id});const j=await r.json();cb.textContent=j.ok?'Copied ✓':'Copy failed';if(!j.ok)cb.title=j.error||'';}
+      catch(e){cb.textContent='Copy failed';}
+      setTimeout(()=>{cb.textContent='Copy cover';cb.disabled=false;},2000);
+    };
+    act.append(cb);
+  }
   // Placeholder: Spotify OAuth not implemented yet
   const sp=el('button','alt','\\u2665 Add to Spotify');sp.id='spot';sp.disabled=true;sp.title='Spotify integration coming soon';
   act.append(sp);
@@ -680,7 +832,7 @@ function renderRetry(s){
   retryKey=key;
   $('retry').hidden=!r;
   if(!r)return;
-  $('retrytxt').textContent='Missed clip from '+r.time+'. Try shazam-api.com? '+(ready?'(uses paid credits)':'Add SHAZAM_API_KEY to .env to enable.');
+  $('retrytxt').textContent='Missed clip from '+r.time+'. Try shazam-api.com? '+(ready?'(uses paid credits)':'Add a shazam-api.com key in Settings to enable.');
   $('retrygo').disabled=!ready;
 }
 function renderHistory(history){
@@ -777,8 +929,31 @@ async function openHelp(){
   showTab(helpTab);
 }
 $('helpbtn').onclick=openHelp;
+// ---- Settings panel
+function keyStatus(id,k){const e=$(id);e.textContent=k.set?'Saved ('+k.hint+')':'Not set';e.className='status '+(k.set?'ok':'muted');e.style.color=k.set?'#6fcf97':'#9aa';}
+async function openSettings(){
+  $('settings').hidden=false;$('setmsg').textContent='';
+  ['k_gsb','k_shz'].forEach(i=>$(i).value='');['c_gsb','c_shz'].forEach(i=>$(i).checked=false);
+  try{const j=await (await fetch('/api/settings')).json();keyStatus('s_gsb',j.getsongbpm_api_key);keyStatus('s_shz',j.shazam_api_key);}catch(e){$('setmsg').textContent='Could not load settings.';}
+}
+$('setbtn').onclick=openSettings;
+$('setclose').onclick=()=>{$('settings').hidden=true;};
+$('setsave').onclick=async()=>{
+  const body={};
+  const g=$('k_gsb').value.trim(),z=$('k_shz').value.trim();
+  if($('c_gsb').checked)body.getsongbpm_api_key='';else if(g)body.getsongbpm_api_key=g;
+  if($('c_shz').checked)body.shazam_api_key='';else if(z)body.shazam_api_key=z;
+  if(!Object.keys(body).length){$('setmsg').textContent='Nothing to save.';return;}
+  try{
+    const r=await post('/api/settings',body),j=await r.json();
+    if(!r.ok||j.ok===false){$('setmsg').textContent=j.error||'Could not save.';return;}
+    keyStatus('s_gsb',j.getsongbpm_api_key);keyStatus('s_shz',j.shazam_api_key);
+    ['k_gsb','k_shz'].forEach(i=>$(i).value='');['c_gsb','c_shz'].forEach(i=>$(i).checked=false);
+    $('setmsg').textContent='Saved.';retryKey='';tick();
+  }catch(e){$('setmsg').textContent='Could not save.';}
+};
 $('helpclose').onclick=()=>{$('help').hidden=true;};
-document.addEventListener('keydown',e=>{if(e.key==='Escape')$('help').hidden=true;});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('help').hidden=true;$('settings').hidden=true;}});
 
 setInterval(tick,1000);tick();
 </script></body></html>"""
