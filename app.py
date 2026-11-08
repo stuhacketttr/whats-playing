@@ -182,8 +182,8 @@ def rec_shazamapi(path: str):
         j = pr.json()
     if j.get("status") == "processing":
         raise RuntimeError("timed out waiting for shazam-api.com to finish")
-    if j.get("status") not in ("success", "no_match", "not_found") and not j.get("results"):
-        raise RuntimeError(f"unexpected response: {str(j)[:200]}")
+    if j.get("status") in ("error", "failed", "failure"):
+        raise RuntimeError(f"shazam-api.com reported a failure: {str(j)[:200]}")
     results = j.get("results") or []
     if j.get("status") != "success" or not results:
         return None

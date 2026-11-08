@@ -300,3 +300,20 @@ def test_shazamapi_polls_until_done(monkeypatch, tmp_path):
     res = app.rec_shazamapi(str(clip))
     assert res["title"] == "T" and res["cover"] == "https://x/c.jpg" and res["genre"] == "G"
     assert urls == ["https://shazam-api.com/api/v2/results/u"] * 2
+
+
+def test_shazamapi_no_matches_is_not_an_error(monkeypatch, tmp_path):
+    import app
+    clip = tmp_path / "c.wav"
+    clip.write_bytes(b"RIFF")
+    monkeypatch.setenv("SHAZAM_API_KEY", "k")
+
+    class R:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return {"apiVersion": 2, "status": "no_matches", "count": 0, "results": []}
+
+    monkeypatch.setattr(app.requests, "post", lambda *a, **k: R())
+    assert app.rec_shazamapi(str(clip)) is None
